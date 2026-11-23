@@ -7,6 +7,7 @@ from .expansion import load
 from .expansion_schemas import ReviewNote, SupportPlan
 from .handoff_models import HandoffAudit, RecoveryDispatch
 from .handoff_schemas import HandoffRequest, RecoveryRequest, RecoveryVerification
+from .quota_schemas import ReschedulePlan
 
 router = APIRouter()
 operators = allow('admin', 'analyst')
@@ -46,6 +47,11 @@ def propose(payload: RecoveryRequest, db=Depends(session), user=Depends(operator
 @router.post('/recovery-dispatches/{key}/release')
 def release(key: int, payload: ReviewNote, db=Depends(session), user=Depends(managers)):
     return recovery_dispatch.release(db, key, payload, user.username)
+
+
+@router.post('/recovery-dispatches/{key}/reschedule')
+def reschedule(key: int, payload: ReschedulePlan, db=Depends(session), user=Depends(operators)):
+    return recovery_dispatch.reschedule(db, key, payload, user.username)
 
 
 @router.post('/recovery-dispatches/{key}/verify')

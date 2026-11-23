@@ -26,13 +26,14 @@ export function bindEvidenceLinks(panel, station) {
 
 export function checkHistory(checks) {
   if (!checks.length) return '<p class="muted">尚未登记补派后的扫描证据。</p>';
-  return table(['营业日', '核验批次 / 录入人', '超时 / 面单', '最迟首扫', '结论'], checks.map(check => [
+  return table(['营业日', '核验批次 / 录入人', '实到', '超时 / 面单', '最迟首扫', '结论'], checks.map(check => [
     esc(check.business_date), `${scanLink(check.batch_code, check.business_date)}<small>${esc(check.checked_by)}</small>`,
+    check.actual_headcount != null ? `${check.actual_headcount} 人` : '—',
     `${check.late_count} / ${check.scan_count} · ${check.late_rate}%`, `${check.worst_minutes} 分`, verdictBadge(check),
   ]));
 }
 
-function offsetDate(day, days) {
+export function offsetDate(day, days) {
   return new Date(Date.parse(day) + days * 86400000).toISOString().slice(0, 10);
 }
 

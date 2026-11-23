@@ -9,11 +9,12 @@ import {followups} from './pages/followups.js';
 import {supports} from './pages/supports.js';
 import {handoffEvidence} from './pages/handoff-evidence.js';
 import {recoveryDispatch} from './pages/recovery-dispatch.js';
+import {quotas} from './pages/quotas.js';
 
 const pages = {
   profiles: ['网点画像', profiles], scans: ['揽收扫描', batches], workbench: ['聚类工作台', workbench],
   tasks: ['整改跟踪', tasks], followups: ['班次复测', followups], supports: ['支援调度', supports],
-  handoff: ['交接证据', handoffEvidence], recovery: ['恢复补派', recoveryDispatch],
+  handoff: ['交接证据', handoffEvidence], recovery: ['恢复补派', recoveryDispatch], quotas: ['名额台账', quotas],
 };
 const app = document.querySelector('#app');
 const brand = `<div class="brand"><span class="brand-mark" aria-hidden="true">栖</span><div><strong>栖云快运</strong><small>杭州直营网 · 揽收时效</small></div></div>`;

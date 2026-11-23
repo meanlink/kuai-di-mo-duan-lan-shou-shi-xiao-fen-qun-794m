@@ -16,6 +16,7 @@ from .auth import allow, current_user, login
 from .db import Base, cache, engine, session
 from .expansion_routes import router as expansion_router
 from .handoff_routes import router as handoff_router
+from .quota_routes import router as quota_router
 from .models import AuditEvent, ClusterRun, PickupBatch, RemediationTask
 from .schemas import AdvanceTask, ImportBatch, Login, ManualReview, RunRequest, Window, validate_window
 
@@ -25,6 +26,11 @@ log = logging.getLogger('uvicorn.error')
 @asynccontextmanager
 async def lifespan(_app):
     Base.metadata.create_all(engine)
+    with engine.begin() as conn:
+        # create_all 不会给既有表补列；为存量演示库补上补派核验的实到人数字段。
+        if not conn.execute(text("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                                 "AND TABLE_NAME = 'recovery_checks' AND COLUMN_NAME = 'actual_headcount'")).first():
+            conn.execute(text('ALTER TABLE recovery_checks ADD COLUMN actual_headcount INT NULL'))
     if os.getenv('SEED_DEMO', 'true').lower() == 'true':
         try:
             seed()
@@ -36,6 +42,7 @@ async def lifespan(_app):
 app = FastAPI(title='快递末端揽收时效分群', lifespan=lifespan)
 app.include_router(expansion_router)
 app.include_router(handoff_router)
+app.include_router(quota_router)
 
 
 @app.middleware('http')

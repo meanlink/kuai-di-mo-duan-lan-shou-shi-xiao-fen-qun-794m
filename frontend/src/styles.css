@@ -208,3 +208,5 @@ dialog header { display: flex; justify-content: space-between; gap: 10px; align-
 .shift-events { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; }
 .shift-events summary { width: fit-content; cursor: pointer; }
 .shift-events .timeline { margin-top: 10px; overflow-wrap: anywhere; }
+.quota-alloc { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 3px 0; }
+.quota-alloc + .quota-alloc { border-top: 1px dashed var(--line); }

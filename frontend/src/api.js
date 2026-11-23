@@ -19,6 +19,8 @@ async function request(path, method = 'GET', data) {
 const pathKey = encodeURIComponent;
 const windowQuery = (fields = {}) => new URLSearchParams({...state.window, ...fields});
 export const api = {
+  shiftQuotas: (region = '') => request(`/shift-quotas?${new URLSearchParams({...state.window, ...(region ? {region} : {})})}`),
+  saveQuota: data => request('/shift-quotas', 'PUT', data),
   handoffAudits: () => request('/handoff-audits'),
   handoffAudit: id => request(`/handoff-audits/${id}`),
   inspectHandoff: data => request('/handoff-audits', 'POST', data),
@@ -26,6 +28,7 @@ export const api = {
   recoveryDispatch: id => request(`/recovery-dispatches/${id}`),
   proposeRecovery: data => request('/recovery-dispatches', 'POST', data),
   releaseRecovery: (id, data) => request(`/recovery-dispatches/${id}/release`, 'POST', data),
+  rescheduleRecovery: (id, data) => request(`/recovery-dispatches/${id}/reschedule`, 'POST', data),
   replanRecovery: (id, data) => request(`/recovery-dispatches/${id}/replan`, 'POST', data),
   verifyRecovery: (id, data) => request(`/recovery-dispatches/${id}/verify`, 'POST', data),
   followups: () => request('/followups'),
@@ -38,6 +41,7 @@ export const api = {
   requestSupport: data => request('/supports', 'POST', data),
   resubmitSupport: (id, data) => request(`/supports/${id}/resubmit`, 'POST', data),
   decideSupport: (id, data) => request(`/supports/${id}/decide`, 'POST', data),
+  rescheduleSupport: (id, data) => request(`/supports/${id}/reschedule`, 'POST', data),
   completeSupport: (id, data) => request(`/supports/${id}/complete`, 'POST', data),
   login: data => request('/auth/login', 'POST', data),
   stations: () => request(`/stations?${windowQuery()}`),

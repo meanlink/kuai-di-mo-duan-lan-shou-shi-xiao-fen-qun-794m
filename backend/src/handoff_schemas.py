@@ -14,3 +14,4 @@ class RecoveryRequest(SupportPlan):
 
 class RecoveryVerification(ReviewNote):
     batch_code: str = Field(min_length=1, max_length=32)
+    actual_headcount: int = Field(ge=1, le=6)

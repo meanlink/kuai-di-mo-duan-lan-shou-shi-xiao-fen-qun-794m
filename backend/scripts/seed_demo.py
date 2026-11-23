@@ -6,6 +6,7 @@ from sqlalchemy.dialects.mysql import insert
 from src.auth import password_hash
 from src.db import transaction
 from src.models import PickupBatch, PickupScan, Station, User
+from src.quota_models import ShiftQuota
 
 DEMO_PASSWORD = 'Pickup1044!'
 ACCOUNTS = ['admin', 'analyst', 'viewer']
@@ -59,6 +60,13 @@ def seed():
                                                   planned_at=planned, scanned_at=planned + timedelta(minutes=elapsed),
                                                   elapsed_minutes=elapsed))
                 db.add(batch)
+        quota_day = date(2026, 11, 16)
+        while quota_day <= date(2026, 12, 8):
+            for region in dict.fromkeys(item[2] for item in STATIONS):
+                for shift in ('morning', 'afternoon', 'evening'):
+                    ensure(db, ShiftQuota, 'region', region=region, business_date=quota_day,
+                           shift=shift, capacity=4, updated_by='admin')
+            quota_day += timedelta(days=1)
     print('Seed committed (existing accounts, station data and batches preserved)')
 
 

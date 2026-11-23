@@ -2,6 +2,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import joinedload
 from fastapi import HTTPException
 
+from . import quota
 from .expansion_models import ShiftFollowup, ShiftSupport
 from .models import AuditEvent, ClusterRun, PickupBatch, PickupScan, RemediationTask, audit
 
@@ -189,8 +190,28 @@ def decide_support(db, key, payload, actor):
     row = load(db, ShiftSupport, key, '支援单', lock=True)
     if row.status != 'requested':
         raise HTTPException(409, '只有待审批的支援单可以审批')
+    if payload.decision == 'approved':
+        # 获批才占名额；名额不足时审批整体失败，单据保持待审批，重试不会重复占用。
+        quota.occupy(db, row.followup.task.station_code, 'support', row.id, row.headcount,
+                     row.business_date, row.followup.shift)
     row.status, row.decision_note = payload.decision, payload.note
     return save_support(db, row, actor, 'support_decided', note=row.decision_note)
+
+
+def reschedule_support(db, key, payload, actor):
+    row = load(db, ShiftSupport, key, '支援单', lock=True)
+    if row.status != 'approved':
+        raise HTTPException(409, '只有已批准待核销的支援单可以改期')
+    followup = row.followup
+    if not 1 <= (payload.business_date - followup.end_date).days <= 14:
+        raise HTTPException(422, '支援营业日须在复测窗口结束后的 14 天内')
+    if payload.business_date == row.business_date:
+        return support_detail(db, row)
+    previous = row.business_date
+    quota.move(db, 'support', row.id, followup.task.station_code, payload.business_date, followup.shift)
+    row.business_date = payload.business_date
+    return save_support(db, row, actor, 'support_rescheduled', date=str(row.business_date),
+                        previous=str(previous), note=payload.note)
 
 
 def complete_support(db, key, payload, actor):
@@ -209,5 +230,6 @@ def complete_support(db, key, payload, actor):
         raise HTTPException(409, '该批次已经用于另一张支援单')
     row.status, row.actual_headcount = 'completed', payload.actual_headcount
     row.evidence_batch, row.completion_note = batch.code, payload.note
+    quota.settle(db, 'support', row.id, payload.actual_headcount)
     return save_support(db, row, actor, 'support_completed', batch=batch.code,
                         headcount=row.actual_headcount, note=row.completion_note)

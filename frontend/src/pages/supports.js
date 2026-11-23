@@ -1,7 +1,7 @@
 import {api} from '../api.js';
 import {action, closeDialog, errorText, esc, notice, options, showDialog} from '../components.js';
 import {canOperate, isManager, state, supportStates} from '../state.js';
-import {bindShiftAction, goTo, noteField, renderDetail, renderLedger, shiftForm} from './shift-ledger.js';
+import {bindShiftAction, goTo, noteField, renderDetail, renderLedger, rescheduleDialog, shiftForm} from './shift-ledger.js';
 
 function dateLimit(end, days) {
   return new Date(Date.parse(end) + days * 86400000).toISOString().slice(0, 10);
@@ -61,7 +61,9 @@ function detail(row, followup, batches) {
     ${row.decision_note ? `<h3>审批意见</h3><p class="note">${esc(row.decision_note)}</p>` : ''}
     ${row.evidence_batch ? `<h3>核销记录</h3><p>支援扫描批次 <span class="mono">${esc(row.evidence_batch)}</span></p><p class="note">${esc(row.completion_note)}</p>
       <a id="handoff-evidence-link" href="#handoff">核查交接扫描证据</a>` : ''}
-    ${stageForm(row, followup, batches)}`;
+    ${stageForm(row, followup, batches)}
+    ${row.status === 'approved' && canOperate() ? `<h3>支援改期</h3><div class="form-actions">
+      <button class="button" id="reschedule-support" type="button">调整支援营业日</button></div>` : ''}`;
 }
 
 export async function supports(node, refresh, current) {
@@ -96,4 +98,8 @@ export async function supports(node, refresh, current) {
   });
   const perform = {requested: api.decideSupport, returned: api.resubmitSupport, approved: api.completeSupport};
   bindShiftAction(panel, fields => perform[row.status](row.id, fields), refresh);
+  const reschedule = panel.querySelector('#reschedule-support');
+  if (reschedule) reschedule.onclick = () => rescheduleDialog(
+    `支援单 #${row.id} 改期`, dateLimit(followup.end_date, 1), dateLimit(followup.end_date, 14),
+    fields => api.rescheduleSupport(row.id, fields), refresh);
 }

@@ -45,6 +45,7 @@ class RecoveryCheck(Base):
     __table_args__ = (
         CheckConstraint('scan_count > 0 AND late_count BETWEEN 0 AND scan_count'),
         CheckConstraint('worst_minutes BETWEEN 0 AND 1440'),
+        CheckConstraint('actual_headcount IS NULL OR actual_headcount BETWEEN 1 AND 6'),
     )
     id: Mapped[int] = col(primary_key=True)
     dispatch_id: Mapped[int] = col(ForeignKey('recovery_dispatches.id'), index=True)
@@ -52,6 +53,7 @@ class RecoveryCheck(Base):
     scan_count: Mapped[int]
     late_count: Mapped[int]
     worst_minutes: Mapped[int]
+    actual_headcount: Mapped[int | None]
     verdict: Mapped[str] = col(Enum('insufficient', 'breach', 'clear'))
     checked_by: Mapped[str] = col(ForeignKey('users.username'))
     created_at: Mapped[datetime] = col(DateTime, default=utcnow)

@@ -7,6 +7,7 @@ from .expansion_models import ShiftFollowup, ShiftSupport
 from .expansion_schemas import (
     FollowupPlan, ReviewNote, SupportCompletion, SupportDecision, SupportPlan, SupportRequest,
 )
+from .quota_schemas import ReschedulePlan
 
 router = APIRouter()
 operators = allow('admin', 'analyst')
@@ -61,6 +62,11 @@ def resubmit(key: int, payload: SupportPlan, db=Depends(session), user=Depends(o
 @router.post('/supports/{key}/decide')
 def decide(key: int, payload: SupportDecision, db=Depends(session), user=Depends(managers)):
     return expansion.decide_support(db, key, payload, user.username)
+
+
+@router.post('/supports/{key}/reschedule')
+def reschedule(key: int, payload: ReschedulePlan, db=Depends(session), user=Depends(operators)):
+    return expansion.reschedule_support(db, key, payload, user.username)
 
 
 @router.post('/supports/{key}/complete')

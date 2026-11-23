@@ -1,8 +1,8 @@
 import {api} from '../api.js';
 import {esc, options} from '../components.js';
 import {canOperate, isManager, recoveryStates, state} from '../state.js';
-import {bindEvidenceLinks, checkHistory, evidenceSummary, recoveryFields, scanLink, verdictBadge} from './handoff-summary.js';
-import {bindShiftAction, goTo, noteField, renderDetail, renderLedger, shiftForm} from './shift-ledger.js';
+import {bindEvidenceLinks, checkHistory, evidenceSummary, offsetDate, recoveryFields, scanLink, verdictBadge} from './handoff-summary.js';
+import {bindShiftAction, goTo, noteField, renderDetail, renderLedger, rescheduleDialog, shiftForm} from './shift-ledger.js';
 
 function dispatchForm(row, batches) {
   if (row.status === 'proposed' && isManager()) {
@@ -13,11 +13,14 @@ function dispatchForm(row, batches) {
       noteField('改派安排', '说明如何补齐扫描样本或改善首扫超时'))}`;
   }
   if (row.status === 'released' && canOperate()) {
-    if (!batches.length) return '<p class="note">暂无匹配批次。<a id="register-recovery-scan" href="#scans">前往揽收扫描登记同班次面单</a></p>';
-    const choices = batches.map(batch => [batch.code, `${batch.code} · ${batch.count} 张面单`]);
-    return `<h3>提交补派核验</h3>${shiftForm('核验扫描结果', `<label>补派扫描批次<select name="batch_code" required>
-      <option value="">请选择批次</option>${options(choices)}</select></label>` +
-      noteField('现场记录', '填写补派完成后的首扫和交接情况'))}`;
+    const verify = !batches.length
+      ? '<p class="note">暂无匹配批次。<a id="register-recovery-scan" href="#scans">前往揽收扫描登记同班次面单</a></p>'
+      : `<h3>提交补派核验</h3>${shiftForm('核验扫描结果', `<div class="form-grid"><label>补派扫描批次<select name="batch_code" required>
+          <option value="">请选择批次</option>${options(batches.map(batch => [batch.code, `${batch.code} · ${batch.count} 张面单`]))}</select></label>
+          <label>实到人数<input type="number" name="actual_headcount" min="1" max="${row.headcount}" value="${row.headcount}" required></label></div>` +
+          noteField('现场记录', '填写实到人数、补派完成后的首扫和交接情况'))}`;
+    return `${verify}<h3>补派改期</h3><div class="form-actions">
+      <button class="button" id="reschedule-recovery" type="button">调整补派营业日</button></div>`;
   }
   return '';
 }
@@ -54,6 +57,12 @@ export async function recoveryDispatch(node, refresh, current) {
   bindShiftAction(panel, fields => {
     if (row.status === 'proposed') return api.releaseRecovery(row.id, fields);
     if (row.status === 'replan') return api.replanRecovery(row.id, {...fields, headcount: Number(fields.headcount)});
-    return api.verifyRecovery(row.id, fields);
+    return api.verifyRecovery(row.id, {...fields, actual_headcount: Number(fields.actual_headcount)});
   }, refresh);
+  const reschedule = panel.querySelector('#reschedule-recovery');
+  if (reschedule) reschedule.onclick = () => {
+    const anchor = row.checks.length ? row.checks.at(-1).business_date : row.evidence.business_date;
+    rescheduleDialog(`补派单 #${row.id} 改期`, offsetDate(anchor, 1), offsetDate(anchor, 7),
+      fields => api.rescheduleRecovery(row.id, fields), refresh);
+  };
 }

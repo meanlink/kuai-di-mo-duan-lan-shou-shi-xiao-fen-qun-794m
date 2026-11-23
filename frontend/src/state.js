@@ -4,8 +4,10 @@ export const state = {
   user: JSON.parse(sessionStorage.getItem(key) || 'null'),
   window: {...demoWindow}, region: '', station: '', run: null, taskStatus: '',
   handoffId: null, handoffSupport: null, recoveryId: null, scanEvidence: null,
-  followupId: null, supportId: null, followupTask: null, supportFollowup: null,
+  followupId: null, supportId: null, followupTask: null, supportFollowup: null, quotaRegion: '',
 };
+export const allocKinds = {support: '支援单', recovery: '补派单'};
+export const allocStates = {held: '在途占用', settled: '实到结算'};
 export const followupStates = {scheduled: '待采样', measured: '待签核', passed: '已达标', failed: '未达标'};
 export const supportStates = {requested: '待审批', approved: '待核销', returned: '已退回', completed: '已核销'};
 export const handoffVerdicts = {insufficient: '样本不足', breach: '持续超时', clear: '达标'};

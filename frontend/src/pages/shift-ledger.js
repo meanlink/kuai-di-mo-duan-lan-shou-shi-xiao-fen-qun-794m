@@ -1,4 +1,4 @@
-import {action, badge, displayTime, empty, errorText, esc, notice} from '../components.js';
+import {action, badge, closeDialog, displayTime, empty, errorText, esc, notice, showDialog} from '../components.js';
 import {shifts, state} from '../state.js';
 
 const tones = {scheduled: 'amber', measured: 'neutral', passed: 'green', failed: 'coral',
@@ -53,4 +53,18 @@ export function bindShiftAction(panel, perform, refresh) {
 export function goTo(panel, selector, beforeNavigate) {
   const link = panel.querySelector(selector);
   if (link) link.onclick = beforeNavigate;
+}
+
+export function rescheduleDialog(title, min, max, perform, refresh) {
+  const dialog = showDialog(title, `<form class="form-stack">
+    <label>新营业日<input type="date" name="business_date" required min="${min}" max="${max}" value="${min}"></label>
+    ${noteField('改期说明', '说明改期原因和现场交接安排')}
+    <p class="muted">新班次有名额才会释放原班次名额；名额不足时改期失败并保留原排班，重试不会重复占用。</p>
+    ${errorText}<div class="form-actions"><button class="button primary" type="submit">确认改期</button></div></form>`);
+  action(dialog.querySelector('form'), async fields => {
+    await perform(fields);
+    closeDialog();
+    notice('改期完成，名额已转入新班次');
+    await refresh();
+  });
 }

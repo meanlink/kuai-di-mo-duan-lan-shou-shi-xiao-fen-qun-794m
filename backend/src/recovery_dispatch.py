@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+from . import quota
 from .expansion import load, timeline
 from .handoff_audit import audit_record
 from .handoff_metrics import measure_batch, metrics_record
@@ -25,7 +26,7 @@ def dispatch_detail(db, row):
         'events': timeline(db, 'recovery', row.id),
         'checks': [metrics_record(check, row.evidence.sla_minutes) | {
             'business_date': check.batch.business_date, 'checked_by': check.checked_by,
-            'created_at': check.created_at,
+            'created_at': check.created_at, 'actual_headcount': check.actual_headcount,
         } for check in db.scalars(query)],
     }
 
@@ -73,14 +74,37 @@ def release(db, key, payload, actor):
     row = load(db, RecoveryDispatch, key, '补派单', lock=True)
     if row.status != 'proposed':
         raise HTTPException(409, '只有待派发的补派单可以派发')
+    source = row.evidence.batch
+    # 派发才占名额；名额不足时派发整体失败，单据保持待派发，重试不会重复占用。
+    quota.occupy(db, source.station_code, 'recovery', row.id, row.headcount, row.business_date, source.shift)
     row.status = 'released'
     return save(db, row, actor, 'recovery_released', headcount=row.headcount, note=payload.note)
+
+
+def reschedule(db, key, payload, actor):
+    row = load(db, RecoveryDispatch, key, '补派单', lock=True)
+    if row.status != 'released':
+        raise HTTPException(409, '只有已派发待核验的补派单可以改期')
+    last_check = db.scalar(select(RecoveryCheck).where(RecoveryCheck.dispatch_id == row.id)
+                           .order_by(RecoveryCheck.id.desc()).limit(1))
+    anchor = last_check.batch.business_date if last_check else row.evidence.batch.business_date
+    if not 1 <= (payload.business_date - anchor).days <= 7:
+        raise HTTPException(422, '补派须安排在交接批次或上次核验后的 1 至 7 个营业日内')
+    if payload.business_date == row.business_date:
+        return dispatch_detail(db, row)
+    previous = row.business_date
+    source = row.evidence.batch
+    quota.move(db, 'recovery', row.id, source.station_code, payload.business_date, source.shift)
+    row.business_date = payload.business_date
+    return save(db, row, actor, 'recovery_rescheduled', previous=str(previous), note=payload.note)
 
 
 def verify(db, key, payload, actor):
     row = load(db, RecoveryDispatch, key, '补派单', lock=True)
     if row.status != 'released':
         raise HTTPException(409, '主管派发后才能提交补派核验')
+    if payload.actual_headcount > row.headcount:
+        raise HTTPException(422, '实到人数不能超过派发人数')
     source = row.evidence.batch
     batch = db.scalar(select(PickupBatch).where(PickupBatch.code == payload.batch_code).with_for_update())
     if not batch or (batch.station_code, batch.shift, batch.business_date) != (
@@ -90,6 +114,8 @@ def verify(db, key, payload, actor):
     if db.scalar(select(RecoveryCheck.id).where(RecoveryCheck.batch_code == batch.code)):
         raise HTTPException(409, '该批次已用于补派核验')
     metrics = measure_batch(db, batch.code, row.evidence.sla_minutes)
-    db.add(RecoveryCheck(dispatch_id=row.id, batch_code=batch.code, checked_by=actor, **metrics))
+    db.add(RecoveryCheck(dispatch_id=row.id, batch_code=batch.code, checked_by=actor,
+                         actual_headcount=payload.actual_headcount, **metrics))
+    quota.settle(db, 'recovery', row.id, payload.actual_headcount)
     row.status = 'verified' if metrics['verdict'] == 'clear' else 'replan'
     return save(db, row, actor, 'recovery_checked', batch=batch.code, note=payload.note)
